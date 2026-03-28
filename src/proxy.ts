@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase/admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 
 // Korumalı rotalar
 const PROTECTED_ROUTES = ["/portal", "/admin"];
@@ -7,39 +7,58 @@ const AUTH_ROUTES = ["/login"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-
   const sessionCookie = req.cookies.get("__session")?.value;
 
   const isProtected = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r));
 
-  // Oturum yoksa korumalı sayfalara erişimi engelle
+  // --- Korumalı sayfa: cookie yoksa login'e at
   if (isProtected && !sessionCookie) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Oturum varsa login sayfasına gitmeyi engelle
-  if (isAuthRoute && sessionCookie) {
-    try {
-      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-      const role = decoded.role ?? "member";
-      return NextResponse.redirect(
-        new URL(role === "admin" ? "/admin" : "/portal", req.url)
-      );
-    } catch {
-      // Cookie geçersiz, devam et
-    }
-  }
+  // --- Cookie varsa doğrula
+  if (sessionCookie) {
+    let decoded: { uid: string } | null = null;
 
-  // Admin sayfaları — sadece admin rolü
-  if (pathname.startsWith("/admin") && sessionCookie) {
     try {
-      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-      if (decoded.role !== "admin") {
-        return NextResponse.redirect(new URL("/portal", req.url));
-      }
+      // revocationCheck=false ile dene (ilk deneme)
+      decoded = await adminAuth.verifySessionCookie(sessionCookie, false);
     } catch {
-      return NextResponse.redirect(new URL("/login", req.url));
+      // Cookie geçersize
+      if (isProtected) {
+        const res = NextResponse.redirect(new URL("/login", req.url));
+        res.cookies.set("__session", "", { maxAge: 0, path: "/" });
+        return res;
+      }
+    }
+
+    if (decoded) {
+      // Login sayfasına erişmeye çalışıyorsa role'e göre yönlendir
+      if (isAuthRoute) {
+        try {
+          const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+          const role = userDoc.data()?.role ?? "member";
+          return NextResponse.redirect(
+            new URL(role === "admin" ? "/admin" : "/portal", req.url)
+          );
+        } catch {
+          return NextResponse.redirect(new URL("/portal", req.url));
+        }
+      }
+
+      // /admin sayfaları — sadece admin rolü
+      if (pathname.startsWith("/admin")) {
+        try {
+          const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+          const role = userDoc.data()?.role;
+          if (role !== "admin") {
+            return NextResponse.redirect(new URL("/portal", req.url));
+          }
+        } catch {
+          return NextResponse.redirect(new URL("/login", req.url));
+        }
+      }
     }
   }
 
