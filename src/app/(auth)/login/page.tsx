@@ -32,10 +32,12 @@ export default function LoginPage() {
 
       // Kullanıcı rolüne göre yönlendir
       const data = await res.json();
+      // Next.js App Router production önbelleğini (cache) kırmak ve 
+      // cookie'lerin tam işlenmesi için tam sayfa yönlendirmesi (hard navigation) yapıyoruz.
       if (data.role === "admin") {
-        router.push("/admin");
+        window.location.href = "/admin";
       } else {
-        router.push("/portal");
+        window.location.href = "/portal";
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Bir hata oluştu.";
