@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  ScrollText,
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -44,6 +45,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Abonelikler", href: "/admin/subscriptions", icon: CreditCard },
   { label: "Müşteriler", href: "/admin/users", icon: Users },
   { label: "Kampanyalar", href: "/admin/campaigns", icon: Megaphone },
+  { label: "Sözleşmeler", href: "/admin/contracts", icon: ScrollText },
 ];
 
 export default function Sidebar({ role }: SidebarProps) {
