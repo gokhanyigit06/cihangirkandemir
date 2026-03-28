@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PROTECTED = ["/portal", "/admin"];
 const AUTH = ["/login"];
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const session = req.cookies.get("__session")?.value;
   const role = req.cookies.get("__role")?.value;

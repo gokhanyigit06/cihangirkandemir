@@ -32,6 +32,13 @@ function getAdminApp(): App {
       process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
       ""
     ).replace(/\\n/g, "\n");
+    
+    // Strip surrounding quotes if present (prevents Coolify/Vercel env var issues)
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    } else if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
+      privateKey = privateKey.slice(1, -1);
+    }
   }
 
   if (!projectId || !clientEmail || !privateKey) {
