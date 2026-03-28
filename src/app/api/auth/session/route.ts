@@ -51,6 +51,15 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
+    // Middleware (Edge Runtime) için hafif rol cookie'si
+    response.cookies.set("__role", userData.role ?? "member", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: expiresIn / 1000,
+      path: "/",
+    });
+
     return response;
   } catch (error) {
     console.error("Session oluşturma hatası:", JSON.stringify(error, Object.getOwnPropertyNames(error)));

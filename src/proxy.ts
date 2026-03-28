@@ -1,74 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
 
-// Korumalı rotalar
-const PROTECTED_ROUTES = ["/portal", "/admin"];
-const AUTH_ROUTES = ["/login"];
+// Middleware Edge Runtime'da çalışır — firebase-admin Node.js SDK'sı burada kullanılamaz.
+// __session: httpOnly güvenli cookie (route handler'larda Firebase Admin ile verify edilir)
+// __role: middleware routing için hafif cookie
+const PROTECTED = ["/portal", "/admin"];
+const AUTH = ["/login"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const sessionCookie = req.cookies.get("__session")?.value;
+  const session = req.cookies.get("__session")?.value;
+  const role = req.cookies.get("__role")?.value;
 
-  const isProtected = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
-  const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r));
-
-  // --- Korumalı sayfa: cookie yoksa login'e at
-  if (isProtected && !sessionCookie) {
+  // Cookie yoksa korumalı sayfalara erişim yok
+  if (PROTECTED.some((p) => pathname.startsWith(p)) && !session) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // --- Cookie varsa doğrula
-  if (sessionCookie) {
-    let decoded: { uid: string } | null = null;
+  // Cookie varken login'e gitmeye çalışıyorsa yönlendir
+  if (AUTH.some((p) => pathname.startsWith(p)) && session) {
+    return NextResponse.redirect(
+      new URL(role === "admin" ? "/admin" : "/portal", req.url)
+    );
+  }
 
-    try {
-      // revocationCheck=false ile dene (ilk deneme)
-      decoded = await adminAuth.verifySessionCookie(sessionCookie, false);
-    } catch {
-      // Cookie geçersize
-      if (isProtected) {
-        const res = NextResponse.redirect(new URL("/login", req.url));
-        res.cookies.set("__session", "", { maxAge: 0, path: "/" });
-        return res;
-      }
-    }
-
-    if (decoded) {
-      // Login sayfasına erişmeye çalışıyorsa role'e göre yönlendir
-      if (isAuthRoute) {
-        try {
-          const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-          const role = userDoc.data()?.role ?? "member";
-          return NextResponse.redirect(
-            new URL(role === "admin" ? "/admin" : "/portal", req.url)
-          );
-        } catch {
-          return NextResponse.redirect(new URL("/portal", req.url));
-        }
-      }
-
-      // /admin sayfaları — sadece admin rolü
-      if (pathname.startsWith("/admin")) {
-        try {
-          const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-          const role = userDoc.data()?.role;
-          if (role !== "admin") {
-            return NextResponse.redirect(new URL("/portal", req.url));
-          }
-        } catch {
-          return NextResponse.redirect(new URL("/login", req.url));
-        }
-      }
-    }
+  // Admin sayfalarına member erişimi engelle
+  if (pathname.startsWith("/admin") && session && role !== "admin") {
+    return NextResponse.redirect(new URL("/portal", req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/portal/:path*",
-    "/admin/:path*",
-    "/login",
-  ],
+  matcher: ["/portal/:path*", "/admin/:path*", "/login"],
 };
