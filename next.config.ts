@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone", // Coolify / Docker için gerekli
+  // Nixpacks kullanıldığında standalone gerekmiyor (npm start kullanır)
   reactCompiler: true,
 };
 
