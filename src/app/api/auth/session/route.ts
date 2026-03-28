@@ -53,9 +53,10 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Session oluşturma hatası:", error);
+    console.error("Session oluşturma hatası:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    const errMsg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Oturum açılamadı." },
+      { error: "Oturum açılamadı.", detail: errMsg },
       { status: 401 }
     );
   }
