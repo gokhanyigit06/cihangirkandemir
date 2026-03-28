@@ -3,7 +3,6 @@ import { getAuth, Auth } from "firebase-admin/auth";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { getStorage, Storage } from "firebase-admin/storage";
 
-// Lazy singleton — build sırasında değil, ilk API çağrısında başlar
 let _app: App | null = null;
 
 function getAdminApp(): App {
@@ -23,7 +22,10 @@ function getAdminApp(): App {
   // Base64 veya düz key desteği
   let privateKey = "";
   if (process.env.FIREBASE_PRIVATE_KEY_BASE64) {
-    privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, "base64").toString("utf-8");
+    privateKey = Buffer.from(
+      process.env.FIREBASE_PRIVATE_KEY_BASE64,
+      "base64"
+    ).toString("utf-8");
   } else {
     privateKey = (
       process.env.FIREBASE_PRIVATE_KEY ||
@@ -34,7 +36,7 @@ function getAdminApp(): App {
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
-      "Firebase Admin env değişkenleri eksik: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY"
+      "Firebase Admin env eksik: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY_BASE64"
     );
   }
 
@@ -46,21 +48,49 @@ function getAdminApp(): App {
   return _app;
 }
 
-// Getter fonksiyonları — her çağrıda lazy init yapar
-export const adminAuth: Auth = new Proxy({} as Auth, {
-  get(_, prop) {
-    return (getAuth(getAdminApp()) as never)[prop as string];
-  },
-});
+// Proxy yerine sade getter fonksiyonları — daha güvenilir
+export function getAdminAuth(): Auth {
+  return getAuth(getAdminApp());
+}
 
-export const adminDb: Firestore = new Proxy({} as Firestore, {
-  get(_, prop) {
-    return (getFirestore(getAdminApp()) as never)[prop as string];
-  },
-});
+export function getAdminDb(): Firestore {
+  return getFirestore(getAdminApp());
+}
 
-export const adminStorage: Storage = new Proxy({} as Storage, {
-  get(_, prop) {
-    return (getStorage(getAdminApp()) as never)[prop as string];
-  },
-});
+export function getAdminStorage(): Storage {
+  return getStorage(getAdminApp());
+}
+
+// Geriye dönük uyumluluk için alias'lar (mevcut kodlar bozulmasın)
+export const adminAuth = {
+  verifyIdToken: (...args: Parameters<Auth["verifyIdToken"]>) =>
+    getAdminAuth().verifyIdToken(...args),
+  verifySessionCookie: (...args: Parameters<Auth["verifySessionCookie"]>) =>
+    getAdminAuth().verifySessionCookie(...args),
+  createSessionCookie: (...args: Parameters<Auth["createSessionCookie"]>) =>
+    getAdminAuth().createSessionCookie(...args),
+  createUser: (...args: Parameters<Auth["createUser"]>) =>
+    getAdminAuth().createUser(...args),
+  updateUser: (...args: Parameters<Auth["updateUser"]>) =>
+    getAdminAuth().updateUser(...args),
+  setCustomUserClaims: (...args: Parameters<Auth["setCustomUserClaims"]>) =>
+    getAdminAuth().setCustomUserClaims(...args),
+  getUserByEmail: (...args: Parameters<Auth["getUserByEmail"]>) =>
+    getAdminAuth().getUserByEmail(...args),
+  deleteUser: (...args: Parameters<Auth["deleteUser"]>) =>
+    getAdminAuth().deleteUser(...args),
+};
+
+export const adminDb = {
+  collection: (...args: Parameters<Firestore["collection"]>) =>
+    getAdminDb().collection(...args),
+  doc: (...args: Parameters<Firestore["doc"]>) =>
+    getAdminDb().doc(...args),
+  runTransaction: (...args: Parameters<Firestore["runTransaction"]>) =>
+    getAdminDb().runTransaction(...args),
+};
+
+export const adminStorage = {
+  bucket: (...args: Parameters<Storage["bucket"]>) =>
+    getAdminStorage().bucket(...args),
+};
