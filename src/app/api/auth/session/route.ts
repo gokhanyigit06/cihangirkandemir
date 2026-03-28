@@ -43,9 +43,11 @@ export async function POST(req: NextRequest) {
       role: userData.role,
     });
 
+    const isHttps = req.headers.get("x-forwarded-proto") === "https" || req.nextUrl.protocol === "https:";
+    
     response.cookies.set("__session", sessionCookie, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && isHttps,
       sameSite: "lax",
       maxAge: expiresIn / 1000,
       path: "/",
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
     // Middleware (Edge Runtime) için hafif rol cookie'si
     response.cookies.set("__role", userData.role ?? "member", {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && isHttps,
       sameSite: "lax",
       maxAge: expiresIn / 1000,
       path: "/",
